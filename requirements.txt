@@ -1,0 +1,5 @@
+selenium
+playwright
+kivy
+requests
+pillow==11.2.1
