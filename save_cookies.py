@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import sys
 from playwright.sync_api import sync_playwright
 
 os.makedirs("cookies", exist_ok=True)
@@ -20,6 +21,12 @@ def check_login_status(page):
 
 def main():
     """Main function to save cookies for a YouTube account"""
+    # Check if batch mode is requested
+    if len(sys.argv) > 1 and sys.argv[1] == "--batch":
+        from batch_login import batch_login_accounts
+        batch_login_accounts()
+        return
+        
     print("=" * 50)
     print("YouTube Account Cookie Saver")
     print("=" * 50)

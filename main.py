@@ -257,12 +257,14 @@ def main_menu():
         print("\n" + "="*50)
         print("📺 YouTube Automation Menu 📺".center(50))
         print("="*50)
-        print("< - 1 - > Add YouTube Account (Save Cookies)")
-        print("< - 2 - > Increase Likes")
-        print("< - 3 - > Increase Subscribers")
-        print("< - 4 - > Increase Views")
-        print("< - 5 - > Add Proxies to File")
-        print("< - 6 - > Exit")
+        print("< - 1 - > Add YouTube Account (Manual Login)")
+        print("< - 2 - > Batch Add Accounts (Email:Password List)")
+        print("< - 3 - > Increase Likes")
+        print("< - 4 - > Increase Subscribers")
+        print("< - 5 - > Increase Views")
+        print("< - 6 - > Add Proxies to File")
+        print("< - 7 - > Configure Proxy API")
+        print("< - 8 - > Exit")
         print("-"*50)
         
         accounts = count_accounts()
@@ -270,23 +272,67 @@ def main_menu():
         print(f"ℹ️ Status: {accounts} accounts, {proxies} proxies available")
         print("-"*50)
 
-        choice = input("Choose an option (1-6): ").strip()
+        choice = input("Choose an option (1-8): ").strip()
 
         if choice == "1":
             add_account()
         elif choice == "2":
-            increase_likes()
+            batch_add_accounts()
         elif choice == "3":
-            increase_subs()
+            increase_likes()
         elif choice == "4":
-            add_views()
+            increase_subs()
         elif choice == "5":
-            add_proxies()
+            add_views()
         elif choice == "6":
+            add_proxies()
+        elif choice == "7":
+            configure_proxy_api()
+        elif choice == "8":
             print("👋 Exiting. Goodbye!")
             break
         else:
-            print("❌ Invalid choice. Please select a number between 1 and 6.")
+            print("❌ Invalid choice. Please select a number between 1 and 8.")
+
+def batch_add_accounts():
+    """Launch the batch account login process"""
+    try:
+        # Use Popen instead of run to avoid blocking the console
+        subprocess.Popen(
+            [sys.executable, "save_cookies.py", "--batch"],
+            creationflags=subprocess.CREATE_NEW_CONSOLE
+        )
+    except subprocess.CalledProcessError:
+        print("❌ Error occurred while launching batch account login.")
+    except Exception as e:
+        print(f"❌ Unexpected error: {str(e)}")
+
+def configure_proxy_api():
+    """Configure proxy API settings"""
+    from proxy_rotator import save_proxy_api_config, fetch_proxies_from_api
+    
+    print("\n" + "="*50)
+    print("🌐 Proxy API Configuration 🌐".center(50))
+    print("="*50)
+    
+    api_url = input("Enter proxy API URL: ").strip()
+    if not api_url:
+        print("❌ API URL cannot be empty.")
+        return
+        
+    api_key = input("Enter API key (optional, press Enter to skip): ").strip()
+    
+    # Save configuration
+    save_proxy_api_config(api_url, api_key)
+    
+    # Test the API
+    print("Testing API connection...")
+    proxies = fetch_proxies_from_api()
+    
+    if proxies:
+        print(f"✅ Successfully fetched {len(proxies)} proxies from API.")
+    else:
+        print("❌ Failed to fetch proxies from API. Please check your configuration.")
 
 if __name__ == "__main__":
     try:

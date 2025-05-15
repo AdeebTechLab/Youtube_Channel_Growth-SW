@@ -25,14 +25,19 @@ def like_video(account_name, video_url, proxy=None):
     """
     Optimized function to like a YouTube video
     """
+    print(f"\n=== Starting like_video for account: {account_name} ===")
+    
     if not os.path.exists("cookies"):
         os.makedirs("cookies")
         print("Created 'cookies' directory")
     
     cookie_file = f"cookies/{account_name}.json"
     if not os.path.exists(cookie_file):
-        print(f"Cookie file for '{account_name}' not found.")
+        print(f"ERROR: Cookie file for '{account_name}' not found at {cookie_file}")
+        print(f"Available cookie files: {os.listdir('cookies')}")
         return False
+    else:
+        print(f"Found cookie file: {cookie_file}")
 
     proxy_settings = None
     if proxy:
@@ -54,7 +59,17 @@ def like_video(account_name, video_url, proxy=None):
                     '--no-default-browser-check',
                     '--disable-translate',
                     '--disable-sync',
-                ]
+                    '--disable-blink-features=AutomationControlled',
+                    '--disable-features=IsolateOrigins,site-per-process',
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--disable-gpu'
+                ],
+                "ignore_default_args": ["--enable-automation"]
             }
             
             if proxy_settings:
@@ -62,8 +77,28 @@ def like_video(account_name, video_url, proxy=None):
                 
             browser = p.chromium.launch(**browser_args)
             
-            # Set viewport size for better visibility
-            context = browser.new_context(viewport={'width': 1280, 'height': 800})
+            # Set viewport size for better visibility and add user agent
+            context = browser.new_context(
+                viewport={'width': 1280, 'height': 800},
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'
+            )
+            
+            # Bypass detection
+            context.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => false
+                });
+                
+                // Overwrite the plugins
+                Object.defineProperty(navigator, 'plugins', {
+                    get: () => [1, 2, 3, 4, 5]
+                });
+                
+                // Overwrite the languages property
+                Object.defineProperty(navigator, 'languages', {
+                    get: () => ['en-US', 'en', 'es']
+                });
+            """)
 
             # Load cookies
             try:
@@ -77,11 +112,6 @@ def like_video(account_name, video_url, proxy=None):
                 return False
 
             page = context.new_page()
-            
-            # Add user agent to appear more like a real browser
-            page.set_extra_http_headers({
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36'
-            })
             
             print(f"Navigating to: {video_url}")
             
@@ -99,14 +129,23 @@ def like_video(account_name, video_url, proxy=None):
                 # Wait for video player to be visible with longer timeout
                 page.wait_for_selector('#movie_player', timeout=15000)
                 
-                # Add some randomized human-like behavior
-                wait_time = random.uniform(3, 5)
-                print(f"Waiting for {wait_time:.1f} seconds...")
+                # Add some minimal wait time for page to load
+                wait_time = random.uniform(2, 3)
+                print(f"Waiting for {wait_time:.1f} seconds for page to load...")
                 time.sleep(wait_time)
                 
                 # Scroll down a bit to make like button visible
                 page.evaluate("window.scrollBy(0, 200)")
-                time.sleep(1)
+                time.sleep(0.5)
+                
+                # Try to dismiss any popups or overlays that might be blocking the like button
+                try:
+                    dismiss_buttons = page.query_selector_all('button[aria-label="Dismiss"], button[aria-label="No thanks"], .ytp-ad-skip-button')
+                    for button in dismiss_buttons:
+                        button.click()
+                        time.sleep(1)
+                except Exception as e:
+                    print(f"Error dismissing popups: {e}")
                 
                 print("Attempting to like the video...")
                 
@@ -117,7 +156,11 @@ def like_video(account_name, video_url, proxy=None):
                     'ytd-menu-renderer.ytd-watch-metadata button[aria-label*="like"]',
                     'button[aria-label*="like this video"]',
                     'button[aria-label*="Like"]',
-                    'ytd-toggle-button-renderer button'
+                    'ytd-toggle-button-renderer button',
+                    '#segmented-like-button button',
+                    'like-button-view-model button',
+                    'button[aria-pressed]',
+                    'button.yt-spec-button-shape-next'
                 ]
                 
                 liked = False
@@ -143,8 +186,8 @@ def like_video(account_name, video_url, proxy=None):
                                   (f" with proxy {proxy}" if proxy_settings else " without proxy"))
                             liked = True
                             
-                            # Wait longer to verify the like was registered
-                            time.sleep(5)
+                            # Brief wait to ensure the like is registered
+                            time.sleep(1)
                             break
                     except Exception as e:
                         print(f"Selector {selector} failed: {str(e)}")
@@ -153,38 +196,75 @@ def like_video(account_name, video_url, proxy=None):
                 if not liked:
                     # Try JavaScript approach as fallback
                     try:
-                        page.evaluate("""
+                        result = page.evaluate("""
                             () => {
-                                // Try multiple selectors
+                                // Try multiple selectors with more comprehensive options
                                 const selectors = [
                                     '#top-level-buttons-computed ytd-toggle-button-renderer:first-child button',
                                     '#top-level-buttons-computed > segmented-like-dislike-button-view-model > yt-smartimation > div > div > like-button-view-model > toggle-button-view-model > button-view-model > button',
                                     'ytd-menu-renderer.ytd-watch-metadata button[aria-label*="like"]',
                                     'button[aria-label*="like this video"]',
-                                    'button[aria-label*="Like"]'
+                                    'button[aria-label*="Like"]',
+                                    '#segmented-like-button button',
+                                    'like-button-view-model button',
+                                    'button[aria-pressed]',
+                                    'button.yt-spec-button-shape-next',
+                                    // Try to find any button that looks like a like button
+                                    'button:has(yt-icon), button:has(svg)'
                                 ];
                                 
+                                // First check if already liked
+                                for (const selector of selectors) {
+                                    const button = document.querySelector(selector);
+                                    if (button && (button.getAttribute('aria-pressed') === 'true' || 
+                                                  button.getAttribute('aria-label')?.toLowerCase().includes('liked'))) {
+                                        console.log('Already liked');
+                                        return 'already-liked';
+                                    }
+                                }
+                                
+                                // Try clicking the like button
                                 for (const selector of selectors) {
                                     const likeButton = document.querySelector(selector);
                                     if (likeButton) {
-                                        likeButton.click();
-                                        return true;
+                                        // Try to determine if this is actually a like button
+                                        const ariaLabel = likeButton.getAttribute('aria-label') || '';
+                                        const innerText = likeButton.innerText || '';
+                                        
+                                        if (ariaLabel.toLowerCase().includes('like') || 
+                                            innerText.toLowerCase().includes('like') ||
+                                            selector.includes('like')) {
+                                            console.log('Found like button, clicking...');
+                                            likeButton.click();
+                                            return true;
+                                        }
                                     }
                                 }
+                                
+                                // Last resort: try to find any button in the video controls area
+                                const allButtons = document.querySelectorAll('#top-level-buttons-computed button, ytd-menu-renderer button');
+                                if (allButtons.length > 0) {
+                                    // Usually the first button is the like button
+                                    allButtons[0].click();
+                                    return 'clicked-first-button';
+                                }
+                                
                                 return false;
                             }
                         """)
-                        print(f"Attempted to like video using JavaScript fallback for account '{account_name}'")
-                        liked = True
+                        print(f"JavaScript fallback result: {result}")
+                        if result == 'already-liked':
+                            print(f"Video already liked by account '{account_name}'")
+                            liked = True
+                        elif result:
+                            print(f"Liked video using JavaScript fallback for account '{account_name}'")
+                            liked = True
                     except Exception as e:
                         print(f"JavaScript fallback failed: {str(e)}")
                 
                 # No screenshot needed
                 
-                # Wait longer after liking to keep browser visible
-                time.sleep(8)
-                
-                # Close browser and return result
+                # Close browser immediately after liking
                 browser.close()
                 return liked
                 

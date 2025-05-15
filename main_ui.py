@@ -94,7 +94,7 @@ kv = '''
                 size_hint_x: 0.7
             
             RoundedButton:
-                text: "Manage Account"
+                text: "Manage Accounts"
                 size_hint_x: 0.15
                 background_color: get_color_from_hex(app.colors['card'])
                 color: get_color_from_hex(app.colors['primary'])
@@ -110,7 +110,7 @@ kv = '''
                 on_release: app.stop()
         
         Label:
-            text: "YouTube Growth Hub"
+            text: "Genz production"
             font_size: dp(28)
             color: get_color_from_hex(app.colors['accent'])
             size_hint_y: None
@@ -527,6 +527,16 @@ class MainScreen(Screen):
         print("Switching to account manager screen")
         self.manager.current = 'account_manager'
     
+    def batch_login(self):
+        # Launch the batch login process
+        try:
+            subprocess.Popen(
+                [sys.executable, "save_cookies.py", "--batch"],
+                creationflags=subprocess.CREATE_NEW_CONSOLE
+            )
+        except Exception as e:
+            self.show_error(f"Error launching batch login: {str(e)}")
+    
     def submit_url(self):
         url = self.ids.url_input.text.strip()
         if not url:
@@ -584,14 +594,19 @@ class MainScreen(Screen):
         return len([f for f in os.listdir("cookies") if f.endswith(".json")])
     
     def get_account_name_by_index(self, i):
-        return f"account{i+1}"
+        # Get actual cookie filenames instead of generating names
+        cookie_files = [f.replace('.json', '') for f in os.listdir("cookies") if f.endswith(".json")]
+        if i < len(cookie_files):
+            return cookie_files[i]
+        else:
+            return f"account{i+1}"  # Fallback to old behavior if index out of range
     
     def process_subscribers(self, count, url, use_proxies):
         proxies = []
         if use_proxies:
-            proxies = load_proxies()
+            proxies = load_proxies()  # This now checks API first, then falls back to file
             if not proxies:
-                self.show_error("No proxies available.")
+                self.show_error("No proxies available. Please add proxies or configure API.")
                 return
             
             # Handle proxy rotation
@@ -605,9 +620,9 @@ class MainScreen(Screen):
     def process_likes(self, count, url, use_proxies):
         proxies = []
         if use_proxies:
-            proxies = load_proxies()
+            proxies = load_proxies()  # This now checks API first, then falls back to file
             if not proxies:
-                self.show_error("No proxies available.")
+                self.show_error("No proxies available. Please add proxies or configure API.")
                 return
             
             # Handle proxy rotation
@@ -621,9 +636,9 @@ class MainScreen(Screen):
     def process_views(self, count, url, use_proxies):
         proxies = []
         if use_proxies:
-            proxies = load_proxies()
+            proxies = load_proxies()  # This now checks API first, then falls back to file
             if not proxies:
-                self.show_error("No proxies available.")
+                self.show_error("No proxies available. Please add proxies or configure API.")
                 return
             
             # Handle proxy rotation
@@ -652,6 +667,8 @@ class MainScreen(Screen):
         
         # Create a list of account names
         accounts = [self.get_account_name_by_index(i) for i in range(count)]
+        print(f"Using accounts: {accounts}")
+        print(f"Available cookie files: {os.listdir('cookies')}")
         
         # Start a background thread for processing
         def process_thread():
@@ -820,11 +837,13 @@ class MainScreen(Screen):
         
         # Create a list of account names
         accounts = [self.get_account_name_by_index(i) for i in range(count)]
+        print(f"Using accounts: {accounts}")
+        print(f"Available cookie files: {os.listdir('cookies')}")
         
         # Start a background thread for processing
         def process_thread():
-            # Determine optimal number of parallel processes
-            max_workers = min(count, 2)  # Limit to 2 parallel processes to avoid overloading
+            # Increase parallel processes for faster execution
+            max_workers = min(count, 4)  # Allow up to 4 parallel processes for faster execution
             
             # Process in batches for better UI responsiveness
             batch_size = max(1, count // 10)  # Process in batches of 10% of total
@@ -927,8 +946,8 @@ class MainScreen(Screen):
         
         # Start a background thread for processing
         def process_thread():
-            # Determine optimal number of parallel processes
-            max_workers = min(count, 2)  # Limit to 2 parallel processes to avoid overloading
+            # Increase parallel processes for faster execution
+            max_workers = min(count, 4)  # Allow up to 4 parallel processes for faster execution
             
             completed = 0
             successes = 0
@@ -1176,11 +1195,11 @@ class ProgressPopup(Popup):
         self.ids.cancel_button.disabled = True
         self.ids.progress_label.text = "Cancelling operation..."
 
-class YouTubeGrowthApp(App):
+class GenzProduction(App):
     colors = COLORS  # Add this line to make COLORS accessible in KV
     
     def __init__(self, **kwargs):
-        super(YouTubeGrowthApp, self).__init__(**kwargs)
+        super(GenzProduction, self).__init__(**kwargs)
         # Pre-load the account manager to improve startup time
         from account_manageui import AccountManagerScreen, COLORS as ACCOUNT_COLORS
         
@@ -1267,7 +1286,13 @@ class YouTubeGrowthApp(App):
         return sm
 
 if __name__ == "__main__":
-    YouTubeGrowthApp().run()
+    GenzProduction().run()
+
+
+
+
+
+
 
 
 
